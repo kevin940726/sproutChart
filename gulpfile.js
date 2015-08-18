@@ -1,9 +1,9 @@
 var gulp = require('gulp'),
     postcss  = require('gulp-postcss'),
-    sass = require('gulp-ruby-sass'),
-    prefix = require('autoprefixer-core'),
-    minifycss = require('gulp-minify-css'),
-    rename = require('gulp-rename');
+    sass = require('gulp-ruby-sass'), // enable sass
+    prefix = require('autoprefixer-core'), // autorprefixer
+    minifycss = require('gulp-minify-css'), // build .min.css
+    rename = require('gulp-rename'); // rename to .min.css
 
 gulp.task('styles', function() {
     return sass('sass', { style: 'expanded' })
