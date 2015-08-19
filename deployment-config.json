@@ -1,8 +1,8 @@
 {
     "type": "ftp",
-    "host": "ftp.25lol.com",
-    "username": "25lol@25sprout.com",
-    "password": "EqOa*o.O2w?K",
+    "host": "********",
+    "username": "**********",
+    "password": "*******",
     "port": 21,
     "remotePath": "/slackcake/",
     "uploadOnSave": false
