@@ -31,6 +31,7 @@
 
 	<!-- My CSS -->
 	<link type="text/css" rel="stylesheet" href="css/reset.min.css">
+	<link type="text/css" rel="stylesheet" href="css/style.min.css">
 
 	<!-- 這個是讓 IE9 以下的 IE 也可以跑 html5 -->
 	<!--[if lt IE 9]>
