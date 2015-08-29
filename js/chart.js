@@ -1,41 +1,57 @@
-Node.prototype.sproutChart = function(options) {
-    var target = this;
-    options = Array.isArray(options) ? {
-        data: options
-    } : options || {};
 
-    var data = options.data || [
-            {name: 'Kevin', value: 8},
-            {name: 'Bob', value: 8},
-            {name: 'Stuart', value: 3},
-            {name: 'Gru', value: 5}
-        ],
-        size = options.size || 360, // svg container size, idealy equals to twice of rHover + max(spaceHover, spaceActive)
-        duration = options.duration || 1000, // transition duration of the first time draw the pie chart
-        materialColor = [
+
+(function() {
+
+
+    "use strict";
+
+
+    function SproutChart(target, options) {
+        var sc = this;
+
+        options = Array.isArray(options) ? {
+            data: options
+        } : options || {};
+
+        sc.data = options.data || [
+                {name: 'Kevin', value: 8},
+                {name: 'Bob', value: 8},
+                {name: 'Stuart', value: 3},
+                {name: 'Gru', value: 5}
+            ];
+        sc.size = options.size || 360; // svg container size, idealy equals to twice of rHover + max(spaceHover, spaceActive)
+        sc.duration = options.duration || 1000; // transition duration of the first time draw the pie chart
+        sc.materialColor = [
             '#f44336', ' #e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722', '#795548', '#9e9e9e', '#607d8b'
         ];
 
-    var ri = Math.floor(Math.random() * materialColor.length);
-    materialColor = materialColor.slice(ri).concat(materialColor.slice(0, ri));
+        var ri = Math.floor(Math.random() * sc.materialColor.length);
+        sc.materialColor = sc.materialColor.slice(ri).concat(sc.materialColor.slice(0, ri));
 
-    // create the svg container
-    var svg = d3.select(target)
-        .append('svg')
-        .attr('width', size)
-        .attr('height', size)
-        .append('g');
+        // create the svg container
+        sc.svg = d3.select(target)
+            .append('svg')
+            .attr('width', this.size)
+            .attr('height', this.size)
+            .append('g');
 
+        return sc;
+    }
 
     // create pie chart
-    var pieChart = function(options) {
+    SproutChart.prototype.pieChart = function(options) {
+        var sc = this;
+        sc.type = 'pie';
+
         options = options || {};
 
         var r = options.r || 150, // radius of pie chart
-            innerRadius = options.innerRadius || 0, // the radius of the donut pie inner space
+            innerRadius = options.innerRadius || 80, // the radius of the donut pie inner space
             rHover = options.rHover || 160, // radius of pie chart when hover
             spaceHover = options.spaceHover || 10, // the space pie pop out when hover
-            spaceActive = options.spaceActive || 20; // the space pie pop out when active
+            spaceActive = options.spaceActive || 20, // the space pie pop out when active
+            showOnStart = options.showOnStart || true; // call transitionForward() on start
+
 
         // function to draw arc
         var drawArc = function(startAngle, endAngle, outerRadius) {
@@ -47,27 +63,27 @@ Node.prototype.sproutChart = function(options) {
         };
 
         // map data to arc function
-        var sum = data.map(function(d) {
+        var sum = sc.data.map(function(d) {
             return d.value;
         }).reduce(function(prev, cur) {
             return prev + cur;
         });
         var accumulate = 0;
-        data = data.map(function(d, i) {
+        sc.data = sc.data.map(function(d, i) {
             return {
                 name: d.name,
                 value: d.value,
-                color: d.color || materialColor[i],
+                color: d.color || sc.materialColor[i],
                 arc: drawArc(accumulate, accumulate += d.value / sum * 2 * Math.PI)
             };
         });
 
         // place the svg container
-        svg.attr('transform', 'translate(' + size / 2 + ', ' + size / 2 + ')');
+        sc.svg.attr('transform', 'translate(' + sc.size / 2 + ', ' + sc.size / 2 + ')');
 
         // draw for each pie
-        var pie = svg.selectAll('path')
-            .data(data)
+        var pie = sc.svg.selectAll('path')
+            .data(sc.data)
             .enter().append('path')
             .style('fill', function(d) {
                 return d.color;
@@ -91,7 +107,7 @@ Node.prototype.sproutChart = function(options) {
                         return 'translate(' + n * d.arc.centroid()[0] + ',' + n * d.arc.centroid()[1] + ')';
                     });
 
-                svg.select('text.percent')
+                sc.svg.select('text.percent')
                     .transition().duration(500)
                     .ease('cubic-out')
                     .attr('opacity', 1)
@@ -126,7 +142,7 @@ Node.prototype.sproutChart = function(options) {
 
         pie.on('mousemove', function(d) {
 
-            var nameText = svg.select('text')
+            var nameText = sc.svg.select('text')
                 .attr('x', function() {
                     return d3.mouse(this)[0] + 10;
                 })
@@ -144,7 +160,7 @@ Node.prototype.sproutChart = function(options) {
                     return this.getBBox().width;
                 });
 
-            svg.select('rect')
+            sc.svg.select('rect')
                 .style('display', 'block')
                 .attr('width', function() {
                     return parseFloat(nameText.attr('width'), 10) + 10;
@@ -168,55 +184,33 @@ Node.prototype.sproutChart = function(options) {
                     })
                     .attr('transform', 'translate(0, 0)');
 
-                svg.select('text.percent').transition()
+                sc.svg.select('text.percent').transition()
                     .duration(500).ease('cubic-out')
                     .attr('opacity', 0);
             }
 
-            svg.select('rect').style('display', 'none');
-            svg.select('text').text('');
+            sc.svg.select('rect').style('display', 'none');
+            sc.svg.select('text').text('');
         });
 
         // start transition animation clip path
-        var clipPath = svg.append('defs').append('clipPath')
+        var clipPath = sc.svg.append('defs').append('clipPath')
             .attr('id', 'clipMask')
             .append('path');
 
-        var transitionForward = function() {
-            clipPath.transition().duration(duration).ease('cubic-out')
-                .attrTween('d', function() {
-                    return function(t) {
-                        return drawArc(0, t * 2 * Math.PI, rHover)();
-                    };
-                });
-
-            return this;
-        };
-
-        var transitionBack = function() {
-            clipPath.transition().duration(duration).ease('cubic-out')
-                .attrTween('d', function() {
-                    return function(t) {
-                        return drawArc(0, (1-t) * 2 * Math.PI, rHover)();
-                    };
-                });
-
-            return this;
-        };
-
         // hover text background
-        var textWrapper = svg.append('rect')
+        var textWrapper = sc.svg.append('rect')
             .style('fill', d3.rgb(0, 0, 0))
             .style('opacity', 0.7)
             .style('display', 'none');
         // hover text
-        var nameText = svg.append('text')
+        var nameText = sc.svg.append('text')
             .attr('class', 'name')
             .style('fill', d3.rgb(255, 255, 255))
             .attr('font-family', 'Montserrat')
             .attr('text-anchor', 'middle');
 
-        var percentText = svg.append('text')
+        var percentText = sc.svg.append('text')
             .attr('x', 0)
             .attr('y', 18)
             .attr('text-anchor', 'middle')
@@ -225,49 +219,73 @@ Node.prototype.sproutChart = function(options) {
             .attr('class', 'percent')
             .style('fill', d3.rgb(0, 0, 0));
 
+        sc.transitionBack = function(callback) {
+            clipPath.transition().duration(sc.duration).ease('cubic-out')
+                .attrTween('d', function() {
+                    return function(t) {
+                        return drawArc(0, (1-t) * 2 * Math.PI, rHover)();
+                    };
+                })
+                .each('end', callback);
 
-
-        function init() {
-            transitionForward();
-        }
-
-        init();
-
-        return {
-            forward: transitionForward,
-            back: transitionBack
+            return sc;
         };
+
+        sc.transitionForward = function(callback) {
+            clipPath.transition().duration(sc.duration).ease('cubic-out')
+                .attrTween('d', function() {
+                    return function(t) {
+                        return drawArc(0, t * 2 * Math.PI, rHover)();
+                    };
+                })
+                .each('end', callback);
+
+            return sc;
+        };
+
+        if (showOnStart)
+            sc.transitionForward();
+
+        return sc;
     };
 
 
-    var barChart = function(options) {
+
+    // create bar chart
+    SproutChart.prototype.barChart = function(options) {
+        var sc = this;
+
+        sc.type = 'bar';
+
         options = options || {};
 
         var barHeight = options.barHeight || 30,
             gap = options.gap || 0,
             padding = options.padding || 50,
+            showOnStart = options.showOnStart || true, // call transitionForward() on start
             max;
 
-        data = data.map(function(d, i) {
+
+        sc.data = sc.data.map(function(d, i) {
             max = max ? (d.value > max ? d.value : max) : d.value;
 
             return {
                 name: d.name,
                 value: d.value,
-                color: d.color || materialColor[i]
+                color: d.color || sc.materialColor[i]
             };
         });
 
-        var ratio = options.ratio || (size - padding * 2) / max;
+        var ratio = options.ratio || (sc.size - padding * 2) / max;
 
-        svg.attr('transform', function() {
-            var y = (size - data.length * (barHeight + gap) - gap) / 2;
+        sc.svg.attr('transform', function() {
+            var y = (sc.size - sc.data.length * (barHeight + gap) - gap) / 2;
 
             return 'translate(' + padding + ', ' + y + ')';
         });
 
-        var bar = svg.selectAll('rect')
-            .data(data)
+        var bar = sc.svg.selectAll('rect')
+            .data(sc.data)
             .enter().append('rect')
             .attr('x', 0)
             .attr('y', function(d, i) {
@@ -278,63 +296,91 @@ Node.prototype.sproutChart = function(options) {
                 return d.color;
             });
 
-        var transitionForward = function() {
+        sc.transitionForward = function(callback) {
             bar.transition()
-                .duration(duration / 2).ease('cubic-out')
+                .duration(sc.duration / 2).ease('cubic-out')
                 .delay(function(d, i) {
-                    return i * (duration / 2 / data.length);
+                    return i * (sc.duration / 2 / sc.data.length);
                 })
                 .attrTween('width', function(d) {
                     var i = d3.interpolate(0, d.value * ratio);
                     return function(t) {
                         return i(t);
                     };
+                })
+                .each('end', function(d, i) {
+                    if (i === sc.data.length - 1)
+                        callback();
                 });
+
+            return sc;
         };
 
-        var transitionBack = function() {
+        sc.transitionBack = function(callback) {
             bar.transition()
-                .duration(duration / 2).ease('cubic-out')
+                .duration(sc.duration / 2).ease('cubic-out')
                 .delay(function(d, i) {
-                    return (data.length - i - 1) * (duration / 2 / data.length);
+                    return (sc.data.length - i - 1) * (sc.duration / 2 / sc.data.length);
                 })
                 .attrTween('width', function(d) {
                     var i = d3.interpolate(d.value * ratio, 0);
                     return function(t) {
                         return i(t);
                     };
+                })
+                .each('end', function(d, i) {
+                    if (i === 0)
+                        callback();
                 });
+
+            return sc;
         };
 
-        function init() {
-            transitionForward();
+        if (showOnStart)
+            sc.transitionForward();
+
+        return sc;
+    };
+
+    SproutChart.prototype.transformTo = function(type, options, callback) {
+        var sc = this;
+
+        callback = typeof(options) === 'function' ? options : callback;
+        options = typeof(options) === 'object' ? options : {};
+
+        if (sc.type === type || !sc.type) {
+            return sc;
         }
 
-        init();
+        sc.transitionBack(function() {
+            sc.svg.selectAll('*').remove();
 
-        return {
-            forward: transitionForward,
-            back: transitionBack
-        };
+            if (type === 'bar')
+                sc.barChart(options);
+            else if (type === 'pie')
+                sc.pieChart(options);
+        });
 
+        if (typeof(callback) === 'function') {
+            callback();
+        }
+
+        return sc;
     };
 
 
-    return {
-        pie: pieChart,
-        bar: barChart
-    };
 
-};
+    // inject to target DOM
+    var chart = new SproutChart(document.getElementById('pie'), [
+        {name: '1', value: 10},
+        {name: '2', value: 13},
+        {name: '3', value: 1},
+        {name: '34', value: 12},
+        {name: '4', value: 8},
+        {name: '5', value: 9}
+    ]);
+    chart.pieChart();
 
-// inject to target DOM
-var pie = document.getElementById('pie').sproutChart([
-    {name: '1', value: 10},
-    {name: '2', value: 13},
-    {name: '3', value: 1},
-    {name: '34', value: 12},
-    {name: '4', value: 8},
-    {name: '5', value: 9}
-]).bar({
-    gap: 0,
-});
+
+
+})();
