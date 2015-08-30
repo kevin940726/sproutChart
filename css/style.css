@@ -1,1 +1,74 @@
 @import url(http://fonts.googleapis.com/css?family=Montserrat);
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+.center {
+  display: inline-block;
+  position: relative;
+  left: 50%;
+  top: 50%;
+  -webkit-transform: translate(-50%, -50%);
+          transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+#changeBtn {
+  margin-left: -9999px;
+  position: absolute;
+}
+#changeBtn + .switch:after {
+  left: 50%;
+}
+#changeBtn + .switch span:first-child {
+  color: #000;
+}
+#changeBtn + .switch span:last-child {
+  color: #FFF;
+}
+#changeBtn:checked + .switch:after {
+  left: 0;
+}
+#changeBtn:checked + .switch span:first-child {
+  color: #FFF;
+}
+#changeBtn:checked + .switch span:last-child {
+  color: #000;
+}
+
+.switch {
+  display: inline-block;
+  position: relative;
+  height: 35px;
+  width: 80px;
+  line-height: 35px;
+  background-color: #FFF;
+  border: 2px solid #3f51b5;
+  cursor: pointer;
+  box-sizing: border-box;
+  border-radius: 5px;
+}
+.switch span {
+  z-index: 1;
+  position: relative;
+  font-size: 1em;
+  text-align: center;
+  display: inline-block;
+  padding: 0 0px;
+  width: 50%;
+  color: #000;
+  height: 100%;
+  transition: color 0.2s ease-out;
+}
+.switch:after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 50%;
+  display: inline-block;
+  background-color: #3f51b5;
+  transition: left 0.2s ease-out;
+}
