@@ -22,15 +22,24 @@
             {name: 'cherry', value: 8},
             {name: 'others', value: 9}
         ]);
+
+        var options = {
+            r: 120,
+            rHover: 130,
+            innerRadius: 90,
+            spaceHover: 0,
+            spaceActive: 10
+        };
+
         // create pie chart
-        chart.pieChart();
+        chart.pieChart(options);
 
         function changeBtn(checkbox) {
             if (checkbox.checked) {
-                chart.transformTo('pie');
+                chart.transformTo('pie', options);
             }
             else {
-                chart.transformTo('bar');
+                chart.transformTo('bar', options);
             }
         }
 

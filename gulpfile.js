@@ -3,7 +3,8 @@ var gulp = require('gulp'),
     sass = require('gulp-ruby-sass'), // enable sass
     prefix = require('autoprefixer-core'), // autorprefixer
     minifycss = require('gulp-minify-css'), // build .min.css
-    rename = require('gulp-rename'); // rename to .min.css
+    rename = require('gulp-rename'), // rename to .min.css
+    connect = require('gulp-connect-php'); // open php server
 
 gulp.task('styles', function() {
     return sass('sass', { style: 'expanded' })
@@ -18,6 +19,10 @@ gulp.task('watch', function() {
   gulp.watch('sass/*.scss', ['styles']);
 });
 
-gulp.task('default', ['watch'], function() {
+gulp.task('connect', function() {
+    connect.server();
+});
+
+gulp.task('default', ['watch', 'connect'], function() {
 
 });

@@ -16,19 +16,77 @@ function SproutChart(target, options) {
         ];
     sc.size = options.size || 360; // svg container size, idealy equals to twice of rHover + max(spaceHover, spaceActive)
     sc.duration = options.duration || 1000; // transition duration of the first time draw the pie chart
+    sc.easing = options.easing || 'cubic-in-out'; // transition easing function, same as d3 easing
     sc.materialColor = [
         '#f44336', ' #e91e63', '#9c27b0', '#673ab7', '#3f51b5', '#2196f3', '#03a9f4', '#00bcd4', '#009688', '#4caf50', '#8bc34a', '#cddc39', '#ffeb3b', '#ffc107', '#ff9800', '#ff5722', '#795548', '#9e9e9e', '#607d8b'
     ];
+    sc.legendCircleSize = options.legendCircleSize || 5;
+    sc.active = 0;
 
     var ri = Math.floor(Math.random() * sc.materialColor.length);
     sc.materialColor = sc.materialColor.slice(ri).concat(sc.materialColor.slice(0, ri));
+
+    // map random color to data
+    sc.data = sc.data.map(function(d, i) {
+        return {
+            name: d.name,
+            value: d.value,
+            color: d.color || sc.materialColor[i]
+        };
+    });
 
     // create the svg container
     sc.svg = d3.select(target)
         .append('svg')
         .attr('width', this.size)
-        .attr('height', this.size)
-        .append('g');
+        .attr('height', this.size);
+
+    sc.legend = sc.svg.append('g')
+        .attr('class', 'legend')
+        .style('opacity', 1);
+
+    sc.legendBackground = sc.legend.append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('stroke', '#EEE')
+        .style('fill', d3.rgb(255, 255, 255))
+        .style('opacity', 0.7);
+
+    sc.legendCircle = sc.legend.selectAll('circle')
+        .data(sc.data).enter()
+        .append('circle')
+        .attr('cx', sc.legendCircleSize)
+        .attr('cy', function(d, i) {
+            return i * (sc.legendCircleSize * 2.5);
+        })
+        .attr('r', sc.legendCircleSize)
+        .style('fill', function(d) {
+            return d.color;
+        });
+
+    sc.legendText = sc.legend.selectAll('text')
+        .data(sc.data).enter()
+        .append('text')
+        .attr('class', 'legendText')
+        .style('fill', d3.rgb(0, 0, 0))
+        .attr('font-size', sc.legendCircleSize)
+        .attr('font-family', 'Montserrat')
+        .attr('text-anchor', 'start')
+        .text(function(d) {
+            return d.name;
+        })
+        .attr('x', sc.legendCircleSize * 2.5)
+        .attr('y', function(d, i) {
+            return i * (sc.legendCircleSize * 2.5) + sc.legendCircleSize / 2;
+        });
+
+    var maxWidth = sc.legendText[0].map(function(t) {
+        return t.getBBox().width + t.getBBox().x;
+    }).reduce(function(prev, cur) {
+        return cur > prev ? cur : prev;
+    });
+    sc.legend.attr('transform', 'translate(' + (sc.size - maxWidth - 10) + ', ' + (sc.size - sc.data.length * (sc.legendCircleSize * 2.5) - 10) + ')');
+
 
     return sc;
 }
@@ -43,9 +101,9 @@ SproutChart.prototype.pieChart = function(options) {
     var r = options.r || 150, // radius of pie chart
         innerRadius = options.innerRadius || 80, // the radius of the donut pie inner space
         rHover = options.rHover || 160, // radius of pie chart when hover
-        spaceHover = options.spaceHover || 10, // the space pie pop out when hover
+        spaceHover = options.spaceHover !== undefined ? options.spaceHover : 10, // the space pie pop out when hover
         spaceActive = options.spaceActive || 20, // the space pie pop out when active
-        showOnStart = options.showOnStart || true; // call transitionForward() on start
+        showOnStart = options.showOnStart !== undefined ? options.showOnStart : true; // call transitionForward() on start
 
 
     // function to draw arc
@@ -73,11 +131,15 @@ SproutChart.prototype.pieChart = function(options) {
         };
     });
 
+
+    var g = sc.svg.append('g')
+        .attr('class', 'pie');
+
     // place the svg container
-    sc.svg.attr('transform', 'translate(' + sc.size / 2 + ', ' + sc.size / 2 + ')');
+    g.attr('transform', 'translate(' + sc.size / 2 + ', ' + sc.size / 2 + ')');
 
     // draw for each pie
-    var pie = sc.svg.selectAll('path')
+    var pie = g.selectAll('path')
         .data(sc.data)
         .enter().append('path')
         .style('fill', function(d) {
@@ -89,9 +151,9 @@ SproutChart.prototype.pieChart = function(options) {
         .style('clip-path', 'url(#clipMask)');
 
     pie.on('mouseover', function(d) {
-        if (!d.active) {
+        if (!sc.active) {
             d3.select(this)
-                .transition().duration(200).ease('cubic-out')
+                .transition().duration(200).ease(sc.easing)
                 .attr('d', function() {
                     return drawArc(d.arc.startAngle()(), d.arc.endAngle()(), rHover)();
                 })
@@ -102,9 +164,9 @@ SproutChart.prototype.pieChart = function(options) {
                     return 'translate(' + n * d.arc.centroid()[0] + ',' + n * d.arc.centroid()[1] + ')';
                 });
 
-            sc.svg.select('text.percent')
+            g.select('text.percent')
                 .transition().duration(500)
-                .ease('cubic-out')
+                .ease(sc.easing)
                 .attr('opacity', 1)
                 .tween('text', function() {
                     var i = d3.interpolate(0, Math.round((d.arc.endAngle()() - d.arc.startAngle()()) / 2 / Math.PI * 100));
@@ -116,9 +178,30 @@ SproutChart.prototype.pieChart = function(options) {
 
     });
 
-    pie.on('click', function(d) {
+    pie.on('click', function(d, i) {
+        if (sc.active) {
+            d3.select(pie[0][sc.active - 1])
+                .transition().duration(200).ease('bounce')
+                .attr('d', function(d) {
+                    return drawArc(d.arc.startAngle()(), d.arc.endAngle()(), r)();
+                })
+                .attr('transform', 'translate(0, 0)');
 
-        if (!d.active) {
+            percentText.transition()
+                .duration(200).ease(sc.easing)
+                .attr('opacity', 0)
+                .attr('y', 18);
+
+            percentName.transition()
+                .duration(200).ease(sc.easing)
+                .attr('opacity', 0);
+
+            if (i + 1 !== sc.active) {
+                sc.data[sc.active - 1].active = false;
+            }
+        }
+
+        if (i + 1 !== sc.active) {
             d3.select(this)
                 .transition().duration(200).ease('bounce')
                 .attr('d', function() {
@@ -130,14 +213,32 @@ SproutChart.prototype.pieChart = function(options) {
 
                     return 'translate(' + n * d.arc.centroid()[0] + ',' + n * d.arc.centroid()[1] + ')';
                 });
+
+            g.select('text.percent')
+                .transition().duration(200)
+                .ease(sc.easing)
+                .attr('opacity', 1)
+                .attr('y', 30)
+                .tween('text', function() {
+                    var i = d3.interpolate(0, Math.round((d.arc.endAngle()() - d.arc.startAngle()()) / 2 / Math.PI * 100));
+                    return function(t) {
+                        this.textContent = Math.round(i(t)) + "%";
+                    };
+                });
+
+            percentName.transition()
+                .duration(200).ease(sc.easing)
+                .attr('opacity', 1)
+                .text(d.name);
         }
 
         d.active = !d.active;
+        sc.active = d.active && i + 1;
     });
 
     pie.on('mousemove', function(d) {
 
-        var nameText = sc.svg.select('text')
+        var nameText = g.select('text')
             .attr('x', function() {
                 return d3.mouse(this)[0] + 10;
             })
@@ -155,7 +256,7 @@ SproutChart.prototype.pieChart = function(options) {
                 return this.getBBox().width;
             });
 
-        sc.svg.select('rect')
+        g.select('rect')
             .style('display', 'block')
             .attr('width', function() {
                 return parseFloat(nameText.attr('width'), 10) + 10;
@@ -171,41 +272,48 @@ SproutChart.prototype.pieChart = function(options) {
     });
 
     pie.on('mouseout', function(d) {
-        if (!d.active) {
+        if (!sc.active) {
             d3.select(this)
-                .transition().duration(200).ease('cubic-out')
+                .transition().duration(200).ease(sc.easing)
                 .attr('d', function() {
                     return drawArc(d.arc.startAngle()(), d.arc.endAngle()())();
                 })
                 .attr('transform', 'translate(0, 0)');
 
-            sc.svg.select('text.percent').transition()
-                .duration(500).ease('cubic-out')
+            g.select('text.percent').transition()
+                .duration(500).ease(sc.easing)
+                .attr('opacity', 0);
+
+            percentName.transition()
+                .duration(200).ease(sc.easing)
                 .attr('opacity', 0);
         }
 
-        sc.svg.select('rect').style('display', 'none');
-        sc.svg.select('text').text('');
+        g.select('rect').style('display', 'none');
+        g.select('text').text('');
     });
 
     // start transition animation clip path
-    var clipPath = sc.svg.append('defs').append('clipPath')
+    var clipPath = g.append('defs').append('clipPath')
         .attr('id', 'clipMask')
-        .append('path');
+        .append('path')
+        .attr('d', function() {
+            return drawArc(0, 10 / r, rHover)();
+        });
 
     // hover text background
-    var textWrapper = sc.svg.append('rect')
+    var textWrapper = g.append('rect')
         .style('fill', d3.rgb(0, 0, 0))
         .style('opacity', 0.7)
         .style('display', 'none');
     // hover text
-    var nameText = sc.svg.append('text')
+    var nameText = g.append('text')
         .attr('class', 'name')
         .style('fill', d3.rgb(255, 255, 255))
         .attr('font-family', 'Montserrat')
         .attr('text-anchor', 'middle');
 
-    var percentText = sc.svg.append('text')
+    var percentText = g.append('text')
         .attr('x', 0)
         .attr('y', 18)
         .attr('text-anchor', 'middle')
@@ -214,11 +322,23 @@ SproutChart.prototype.pieChart = function(options) {
         .attr('class', 'percent')
         .style('fill', d3.rgb(0, 0, 0));
 
+    var percentName = g.append('text')
+        .attr('x', 0)
+        .attr('y', -30)
+        .attr('text-anchor', 'middle')
+        .attr('font-size', 20)
+        .attr('font-family', 'Montserrat')
+        .attr('class', 'percentName')
+        .style('fill', d3.rgb(0, 0, 0))
+        .attr('opacity', 0);
+
     sc.transitionBack = function(callback, options) {
-        clipPath.transition().duration(sc.duration).ease('cubic-out')
+        clipPath.transition().duration(sc.duration).ease(sc.easing)
             .attrTween('d', function() {
+                var i = d3.interpolate(2 * Math.PI, 10 / r);
+
                 return function(t) {
-                    return drawArc(0, (1-t) * 2 * Math.PI, rHover)();
+                    return drawArc(0, i(t), rHover)();
                 };
             })
             .each('end', callback);
@@ -227,10 +347,12 @@ SproutChart.prototype.pieChart = function(options) {
     };
 
     sc.transitionForward = function(callback) {
-        clipPath.transition().duration(sc.duration).ease('cubic-out')
+        clipPath.transition().duration(sc.duration).ease(sc.easing)
             .attrTween('d', function() {
+                var i = d3.interpolate(10 / r, 2 * Math.PI);
+
                 return function(t) {
-                    return drawArc(0, t * 2 * Math.PI, rHover)();
+                    return drawArc(0, i(t), rHover)();
                 };
             })
             .each('end', callback);
@@ -257,9 +379,8 @@ SproutChart.prototype.barChart = function(options) {
     var barHeight = options.barHeight || 30,
         gap = options.gap || 0,
         padding = options.padding || 50,
-        showOnStart = options.showOnStart || true, // call transitionForward() on start
+        showOnStart = options.showOnStart !== undefined ? options.showOnStart : true , // call transitionForward() on start
         max;
-
 
     sc.data = sc.data.map(function(d, i) {
         max = max ? (d.value > max ? d.value : max) : d.value;
@@ -273,13 +394,17 @@ SproutChart.prototype.barChart = function(options) {
 
     var ratio = options.ratio || (sc.size - padding * 2) / max;
 
-    sc.svg.attr('transform', function() {
+    // create the svg container
+    var g = sc.svg.append('g')
+        .attr('class', 'bar');
+
+    g.attr('transform', function() {
         var y = (sc.size - sc.data.length * (barHeight + gap) - gap) / 2;
 
         return 'translate(' + padding + ', ' + y + ')';
     });
 
-    var bar = sc.svg.selectAll('rect')
+    var bar = g.selectAll('rect')
         .data(sc.data)
         .enter().append('rect')
         .attr('x', 0)
@@ -287,12 +412,13 @@ SproutChart.prototype.barChart = function(options) {
             return i * (barHeight + gap);
         })
         .attr('height', barHeight)
-        .attr('width', 0)
+        .attr('width', 10)
         .style('fill', function(d) {
             return d.color;
-        });
+        })
+        .style('clip-path', 'url(#clipMask)');
 
-    var barValue = sc.svg.selectAll('text')
+    var barValue = g.selectAll('text')
         .data(sc.data)
         .enter().append('text')
         .attr('class', 'bar-value')
@@ -300,12 +426,13 @@ SproutChart.prototype.barChart = function(options) {
         .attr('y', function(d, i) {
             return i * (barHeight + gap) + barHeight * 0.7;
         })
+        .attr('opacity', 0)
         .attr('font-size', barHeight * 0.7)
         .attr('font-family', 'Montserrat')
         .attr('text-anchor', 'start');
 
     bar.on('mousemove', function(d) {
-        var nameText = sc.svg.select('text.name')
+        var nameText = g.select('text.name')
             .attr('x', function() {
                 return d3.mouse(this)[0] + 10;
             })
@@ -323,7 +450,7 @@ SproutChart.prototype.barChart = function(options) {
                 return this.getBBox().width;
             });
 
-        sc.svg.select('rect.nameBackground')
+        g.select('rect.nameBackground')
             .style('display', 'block')
             .attr('width', function() {
                 return parseFloat(nameText.attr('width'), 10) + 10;
@@ -338,13 +465,13 @@ SproutChart.prototype.barChart = function(options) {
     });
 
     bar.on('mouseout', function(d) {
-        sc.svg.select('rect.nameBackground').style('display', 'none');
-        sc.svg.select('text.name').text('');
+        g.select('rect.nameBackground').style('display', 'none');
+        g.select('text.name').text('');
     });
 
     sc.transitionForward = function(callback) {
         bar.transition()
-            .duration(sc.duration / 2).ease('cubic-out')
+            .duration(sc.duration / 2).ease(sc.easing)
             .delay(function(d, i) {
                 return i * (sc.duration / 2 / sc.data.length);
             })
@@ -357,7 +484,7 @@ SproutChart.prototype.barChart = function(options) {
             });
 
         barValue.transition()
-            .duration(sc.duration / 2).ease('cubic-out')
+            .duration(sc.duration / 2).ease(sc.easing)
             .delay(function(d, i) {
                 return i * (sc.duration / 2 / sc.data.length);
             })
@@ -373,23 +500,26 @@ SproutChart.prototype.barChart = function(options) {
                 };
             });
 
+        clipPath.transition().duration(sc.duration * (sc.data.length - 1) / sc.data.length).ease(sc.easing)
+            .attr('height', sc.size);
+
         return sc;
     };
 
     sc.transitionBack = function(callback) {
         bar.transition()
-            .duration(sc.duration / 2).ease('cubic-out')
+            .duration(sc.duration / 2).ease(sc.easing)
             .delay(function(d, i) {
                 return (sc.data.length - i - 1) * (sc.duration / 2 / sc.data.length);
             })
-            .attr('width', 0)
+            .attr('width', 10)
             .each('end', function(d, i) {
                 if (i === 0 && typeof(callback) === 'function')
                     callback();
             });
 
         barValue.transition()
-            .duration(sc.duration / 2).ease('cubic-out')
+            .duration(sc.duration / 2).ease(sc.easing)
             .delay(function(d, i) {
                 return (sc.data.length - i - 1) * (sc.duration / 2 / sc.data.length);
             })
@@ -403,17 +533,28 @@ SproutChart.prototype.barChart = function(options) {
                 };
             });
 
+        clipPath.transition().duration(sc.duration * (sc.data.length - 1) / sc.data.length).ease(sc.easing)
+            .attr('height', barHeight);
+
         return sc;
     };
 
+    var clipPath = g.append('defs').append('clipPath')
+        .attr('id', 'clipMask')
+        .append('rect')
+        .attr('x', 0)
+        .attr('y', 0)
+        .attr('height', barHeight)
+        .attr('width', sc.size);
+
     // hover text background
-    var textWrapper = sc.svg.append('rect')
+    var textWrapper = g.append('rect')
         .attr('class', 'nameBackground')
         .style('fill', d3.rgb(0, 0, 0))
         .style('opacity', 0.7)
         .style('display', 'none');
     // hover text
-    var nameText = sc.svg.append('text')
+    var nameText = g.append('text')
         .attr('class', 'name')
         .style('fill', d3.rgb(255, 255, 255))
         .attr('font-family', 'Montserrat')
@@ -437,8 +578,8 @@ SproutChart.prototype.transformTo = function(type, options, callback) {
 
     sc.transitionBack();
 
-    sc.svg.transition()
-        .duration(sc.duration).ease('cubic-out')
+    sc.svg.select('g:not(.legend)').transition()
+        .duration(sc.duration).ease(sc.easing)
         .attr('transform', function(d) {
             var barHeight = options.barHeight || 30,
                 gap = options.gap || 0,
@@ -453,12 +594,15 @@ SproutChart.prototype.transformTo = function(type, options, callback) {
                 return 'translate(' + sc.size / 2 + ', ' + (sc.size / 2 - r) + ')';
         })
         .each('end', function() {
-            sc.svg.selectAll('*').remove();
-
-            if (type === 'bar')
+            if (type === 'bar') {
                 sc.barChart(options);
-            else if (type === 'pie')
+                sc.svg.select('g:not(.bar):not(.legend)').remove();
+            }
+            else if (type === 'pie') {
                 sc.pieChart(options);
+                sc.svg.select('g:not(.pie):not(.legend)').remove();
+            }
+
         });
 
     if (typeof(callback) === 'function') {
