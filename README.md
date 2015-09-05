@@ -1,7 +1,4 @@
-# 25template
-front end web development template workflow.
+# sproutChart
+pie and bar chart fancy transition with D3.js.
 
-* `gulp`
-* `autoprefixer`
-* `SASS`
-* `atom sftp ftp`
+STILL IN PROGRESS
